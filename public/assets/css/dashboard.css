@@ -1,0 +1,282 @@
+/* 
+   SISTEMA DE CONTROL DE COCHERA
+   Estilos CSS para el Dashboard
+*/
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+    /* Espacios Grid */
+    .espacios-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+        padding: 20px 0;
+    }
+
+    .espacio-item {
+        background: white;
+        border: 3px solid #ddd;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: relative;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .espacio-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    }
+
+    /* Estados de Espacios */
+    .espacio-libre {
+        border-color: #28a745;
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    }
+
+    .espacio-libre:hover {
+        border-color: #1e7e34;
+        background: linear-gradient(135deg, #c3e6cb 0%, #b8dfbc 100%);
+    }
+
+    .espacio-ocupado {
+        border-color: #dc3545;
+        background: linear-gradient(135deg, #f8d7da 0%, #f1b0b7 100%);
+    }
+
+    .espacio-ocupado:hover {
+        border-color: #a71e2a;
+        background: linear-gradient(135deg, #f1b0b7 0%, #e8a1a8 100%);
+    }
+
+    .espacio-mantenimiento {
+        border-color: #fd7e14;
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    }
+
+    .espacio-mantenimiento:hover {
+        border-color: #d63384;
+        background: linear-gradient(135deg, #ffeaa7 0%, #ffd93d 100%);
+    }
+
+    /* Elementos del Espacio */
+    .espacio-numero {
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    .espacio-icono {
+        font-size: 2.5rem;
+        margin: 10px 0;
+        color: #666;
+    }
+
+    .espacio-libre .espacio-icono {
+        color: #28a745;
+    }
+
+    .espacio-ocupado .espacio-icono {
+        color: #dc3545;
+    }
+
+    .espacio-mantenimiento .espacio-icono {
+        color: #fd7e14;
+    }
+
+    .espacio-estado {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .espacio-placa {
+        background: rgba(0,0,0,0.1);
+        color: #333;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: bold;
+        margin-top: 5px;
+        display: inline-block;
+    }
+
+    /* Cards de Estadísticas */
+    .card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        border-radius: 15px 15px 0 0 !important;
+        border: none;
+    }
+
+    /* Modal Personalizado */
+    .modal-content {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        border: none;
+    }
+
+    .modal-footer {
+        border: none;
+        border-radius: 0 0 15px 15px;
+    }
+
+    /* Formularios */
+    .form-control {
+        border-radius: 8px;
+        border: 2px solid #e9ecef;
+        padding: 10px 15px;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+
+    /* Input especial para Total a Pagar */
+    .total-pagar {
+        background: #e8f5e8;
+        border-color: #28a745;
+        font-size: 1.2rem;
+        font-weight: bold;
+        text-align: center;
+        color: #155724;
+    }
+
+    /* Botones */
+    .btn {
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    }
+
+    /* Alertas */
+    .alert {
+        border: none;
+        border-radius: 10px;
+        font-weight: 500;
+    }
+
+    /* Navbar */
+    .navbar-brand {
+        font-weight: bold;
+        font-size: 1.3rem;
+    }
+
+    .navbar {
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .espacios-grid {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+    
+        .espacio-item {
+            padding: 15px;
+            min-height: 120px;
+        }
+    
+        .espacio-icono {
+            font-size: 2rem;
+        }
+    
+        .espacio-numero {
+            font-size: 1rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .espacios-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* Animaciones */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .espacio-item {
+        animation: fadeIn 0.5s ease forwards;
+    }
+
+    /* Loading spinner */
+    .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    /* Estado de carga en botones */
+    .btn-loading {
+        pointer-events: none;
+        opacity: 0.65;
+    }
+
+    /* Efectos hover adicionales */
+    .card-body:hover {
+        background: rgba(255,255,255,0.1);
+    }
+
+    /* Estilos para impresión */
+    @media print {
+        .navbar, .modal, .btn {
+            display: none !important;
+        }
+    
+        body {
+            background: white !important;
+        }
+    }
