@@ -4,75 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Servicios - Sistema de Control de Cochera</title>
+    <title>Sistema de Cochera</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <link href="assets/css/dashboard.css" rel="stylesheet">
 
 </head>
-<style>
-    body {
-        background-color: #f8f9fa;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
 
-    .card {
-        border: none;
-        border-radius: 15px;
-        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .card-header {
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-        color: white;
-        border-radius: 15px 15px 0 0 !important;
-        border: none;
-    }
-
-    .table {
-        border-radius: 10px;
-        overflow: hidden;
-    }
-
-    .table th {
-        background-color: #f8f9fa;
-        border-bottom: 2px solid #dee2e6;
-        font-weight: 600;
-    }
-
-    .total-section {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        color: white;
-        border-radius: 15px;
-        padding: 20px;
-        text-align: center;
-        margin-top: 20px;
-    }
-
-    .filtros-section {
-        background: white;
-        border-radius: 15px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    }
-
-    .btn {
-        border-radius: 8px;
-        font-weight: z0;
-    }
-
-    @media print {
-        .no-print {
-            display: none !important;
-        }
-
-        body {
-            background: white !important;
-        }
-    }
-</style>
 
 <body>
     <?php
@@ -87,6 +27,7 @@
     // Obtener filtros
     $fecha_inicio = $_GET['fecha_inicio'] ?? '';
     $fecha_fin = $_GET['fecha_fin'] ?? '';
+    $cajero_seleccionado = $_GET['cajero'] ?? null; // filtro por cajero
 
     // Si no hay filtros, usar fecha actual
     if (empty($fecha_inicio) && empty($fecha_fin)) {
@@ -94,20 +35,25 @@
         $fecha_fin = date('Y-m-d');
     }
 
-    // Obtener servicios (filtrados según el tipo de usuario)
+    // Si es admin, obtener lista de usuarios para el select
+    $usuarios = esAdmin() ? obtenerTodosUsuarios() : [];
+
+    // Obtener servicios (filtrados según tipo de usuario y posible filtro por cajero)
     $servicios = obtenerHistorialServicios(
-        $fecha_inicio, 
-        $fecha_fin, 
-        $usuario['id_usuario'], 
-        esAdmin()
+        $fecha_inicio,
+        $fecha_fin,
+        $usuario['id_usuario'],
+        esAdmin(),
+        $cajero_seleccionado
     );
 
-    // Calcular total
+    // Calcular total recaudado
     $total_recaudado = 0;
     foreach ($servicios as $servicio) {
         $total_recaudado += $servicio['importe'];
     }
     ?>
+
 
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -129,14 +75,14 @@
                 <?php endif; ?>
             </div>
             <div class="navbar-nav ms-3">
-
-                <a class="nav-link text-white" href="servicio.php">
-                    <i class="fas fa-users-cog me-1"></i>En Servicio
-                </a>
+                <?php if (!esAdmin()): ?>
+                    <a class="nav-link text-white" href="servicio.php">
+                        <i class="fas fa-users-cog me-1"></i>En Servicio
+                    </a>
+                <?php endif; ?>
                 <a class="nav-link text-white" href="registro.php">
                     <i class="fas fa-th-large me-1"></i>Registro
                 </a>
-
             </div>
 
             <div class="navbar-nav ms-auto">
@@ -149,199 +95,224 @@
 
         </div>
     </nav>
-    <div class="modal fade" id="usuarioModal" tabindex="-1" aria-labelledby="usuarioModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content text-center p-3">
 
-                <!-- Icono de usuario -->
-                <div class="mb-3">
-                    <i class="fas fa-user-circle fa-5x text-primary"></i>
+    <!-- MODAL USUARIO -->
+    <div class="modal fade" id="usuarioModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-md">
+            <div class="modal-content shadow-lg border-0">
+
+                <!-- Header -->
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title d-flex align-items-center">
+                        <i class="fas fa-id-badge me-2"></i>
+                        Perfil de Usuario
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
-                <!-- Título -->
-                <h5 class="modal-title mb-3" id="usuarioModalLabel">Información del Usuario</h5>
-
-                <!-- Cuerpo del modal -->
+                <!-- Body -->
                 <div class="modal-body">
 
-                    <p class="fs-5"><strong>Usuario:</strong> <?= htmlspecialchars($usuario['usuario']) ?></p>
-                    <p class="fs-5"><strong>Cargo:</strong> <?= $usuario['cargo'] === 'A' ? 'Administrador' : 'Básico' ?></p>
+                    <!-- Avatar -->
+                    <div class="text-center mb-3">
+                        <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center"
+                            style="width:110px;height:110px;">
+                            <i class="fas fa-user fa-4x text-primary"></i>
+                        </div>
+                    </div>
 
-                    <p class="fs-1"><strong>Bienvenido al sistema</strong></p>
+                    <!-- Nombre -->
+                    <h5 class="text-center fw-bold mb-1">
+                        <?= htmlspecialchars($usuario['nombre']); ?>
+                    </h5>
+
+                    <!-- Rol -->
+                    <div class="text-center mb-3">
+                        <span class="badge <?= $usuario['cargo'] === 'A' ? 'bg-success' : 'bg-secondary' ?> px-3 py-2">
+                            <i class="fas fa-user-shield me-1"></i>
+                            <?= $usuario['cargo'] === 'A' ? 'Administrador' : 'Usuario' ?>
+                        </span>
+                    </div>
+
+                    <!-- Info -->
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-user text-primary me-2"></i>
+                                <span class="fw-semibold">Usuario:</span>
+                                <span class="ms-auto"><?= htmlspecialchars($usuario['usuario']) ?></span>
+                            </div>
+
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-circle-check text-success me-2"></i>
+                                <span class="fw-semibold">Estado:</span>
+                                <span class="ms-auto">Activo</span>
+                            </div>
+
+                        </div>
+                    </div>
 
                 </div>
 
                 <!-- Footer -->
-                <div class="modal-footer justify-content-center">
-                    <a href="logout.php" class="btn btn-danger me-2">
-                        <i class="fas fa-sign-out-alt me-1"></i>Cerrar Sesión
-                    </a>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        Cerrar
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cerrar
                     </button>
+
+                    <a href="logout.php" class="btn btn-danger">
+                        <i class="fas fa-sign-out-alt me-1"></i> Cerrar sesión
+                    </a>
                 </div>
+
             </div>
         </div>
     </div>
 
 
     <!-- Contenido Principal -->
-    <div class="container-fluid py-4">
+    <div class="container-fluid py-4 px-2 px-md-3">
+
         <!-- Filtros -->
-        <div class="filtros-section no-print">
-            <h5 class="mb-3">
-                <i class="fas fa-filter me-2"></i>
-                Filtros de Búsqueda
-            </h5>
+        <div class="card mb-4 shadow-sm no-print">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filtros de Búsqueda</h5>
+                <form method="GET" action="" class="row g-3 align-items-end">
 
-            <form method="GET" action="" class="row g-3">
-                <div class="col-md-4">
-                    <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
-                    <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio"
-                        value="<?php echo $fecha_inicio; ?>">
-                </div>
+                    <!-- Fecha Inicio -->
+                    <div class="col-md-3">
+                        <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
+                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" value="<?= $fecha_inicio; ?>">
+                    </div>
 
-                <div class="col-md-4">
-                    <label for="fecha_fin" class="form-label">Fecha Fin</label>
-                    <input type="date" class="form-control" id="fecha_fin" name="fecha_fin"
-                        value="<?php echo $fecha_fin; ?>">
-                </div>
+                    <!-- Fecha Fin -->
+                    <div class="col-md-3">
+                        <label for="fecha_fin" class="form-label">Fecha Fin</label>
+                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin" value="<?= $fecha_fin; ?>">
+                    </div>
 
-                <div class="col-md-4">
-                    <label class="form-label">&nbsp;</label>
-                    <div class="d-grid gap-2 d-md-flex">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search me-1"></i>Filtrar
+                    <!-- Cajero (solo admin) -->
+                    <?php if (esAdmin()): ?>
+                        <div class="col-md-3">
+                            <label for="cajero" class="form-label">Cajero</label>
+                            <select class="form-select" id="cajero" name="cajero">
+                                <option value="">Todos</option>
+                                <?php foreach ($usuarios as $u): ?>
+                                    <option value="<?= $u['id_usuario']; ?>" <?= ($cajero_seleccionado == $u['id_usuario']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($u['nombre_completo']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Botones -->
+                    <div class="col-md-3 d-flex gap-2 flex-column flex-md-row">
+                        <button type="submit" class="btn btn-primary flex-fill">
+                            <i class="fas fa-search me-1"></i> Filtrar
                         </button>
-                        <a href="registro.php" class="btn btn-secondary">
-                            <i class="fas fa-refresh me-1"></i>Limpiar
+                        <a href="registro.php" class="btn btn-secondary flex-fill">
+                            <i class="fas fa-refresh me-1"></i> Limpiar
                         </a>
                     </div>
-                </div>
-            </form>
+
+                </form>
+            </div>
         </div>
 
         <!-- Tabla de Servicios -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-list me-2"></i>
-                            Registro de Servicios
-                            <?php if ($fecha_inicio && $fecha_fin): ?>
-                                <small class="ms-2">
-                                    (<?php echo formatearFecha($fecha_inicio, 'd/m/Y'); ?> -
-                                    <?php echo formatearFecha($fecha_fin, 'd/m/Y'); ?>)
-                                </small>
-                            <?php endif; ?>
-                        </h5>
-
-                        <div class="no-print">
-                            <button type="button" class="btn btn-light btn-sm me-2" onclick="imprimirReporte()">
-                                <i class="fas fa-print me-1"></i>Imprimir Reporte
-                            </button>
-                            <button type="button" class="btn btn-success btn-sm me-2" onclick="descargarReporte()">
-                                <i class="fas fa-file-csv me-1"></i>Descargar CSV
-                            </button>
-                            <button type="button" class="btn btn-danger btn-sm" onclick="descargarReportePDF()">
-                                <i class="fas fa-file-pdf me-1"></i>Descargar PDF
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="card-body p-0">
-                        <?php if (empty($servicios)): ?>
-                            <div class="text-center py-5">
-                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                <h5 class="text-muted">No hay servicios registrados</h5>
-                                <p class="text-muted">No se encontraron servicios en el rango de fechas seleccionado.</p>
-                            </div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Placa</th>
-                                            <th>Cochera</th>
-                                            <th>Fecha Registro</th>
-                                            <th>Hora Inicio</th>
-                                            <th>Fecha Salida</th>
-                                            <th>Hora Salida</th>
-                                            <th>Duración</th>
-                                            <th>Precio/Hora</th>
-                                            <th>Total</th>
-                                            <th>Fecha Pago</th>
-                                           
-                                                <th>Usuario</th>
-                                           
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($servicios as $servicio): ?>
-                                            <tr>
-                                                <td><?php echo $servicio['id_alquiler']; ?></td>
-                                                <td><strong><?php echo $servicio['placa']; ?></strong></td>
-                                                <td><span class="badge bg-primary"><?php echo $servicio['codigo']; ?></span></td>
-                                                <td><?php echo formatearFecha($servicio['fecha_ingreso'], 'd/m/Y'); ?></td>
-                                                <td><?php echo date('H:i', strtotime($servicio['hora_ingreso'])); ?></td>
-                                                <td><?php echo formatearFecha($servicio['fecha_salida'], 'd/m/Y'); ?></td>
-                                                <td><?php echo date('H:i', strtotime($servicio['hora_salida'])); ?></td>
-                                                <td><span class="badge bg-info"><?php echo number_format($servicio['duracion']); ?>m</span></td>
-                                                <td>S/ <?= number_format(3, 2) ?></td>
-                                                <td><strong class="text-success">S/. <?php echo number_format($servicio['importe'], 2); ?></strong></td>
-                                                <td><?php echo formatearFecha($servicio['fecha_pago'], 'd/m/Y H:i'); ?></td>
-
-                                              
-                                                    <td><?php echo $servicio['usuario_nombres'] . ' ' . $servicio['usuario_apellidos']; ?></td>
-                                                
-
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Registro de Servicios
+                    <?php if ($fecha_inicio && $fecha_fin): ?>
+                        <small class="ms-2">(<?= formatearFecha($fecha_inicio, 'd/m/Y'); ?> - <?= formatearFecha($fecha_fin, 'd/m/Y'); ?>)</small>
+                    <?php endif; ?>
+                </h5>
+                <div class="no-print">
+                    <button type="button" class="btn btn-light btn-sm me-2" onclick="imprimirReporte()">
+                        <i class="fas fa-print me-1"></i> Imprimir
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm me-2" onclick="descargarReporte()">
+                        <i class="fas fa-file-csv me-1"></i> CSV
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="descargarReportePDF()">
+                        <i class="fas fa-file-pdf me-1"></i> PDF
+                    </button>
                 </div>
+            </div>
 
-                <?php if (!empty($servicios)): ?>
-                    <div class="total-section">
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <h4 class="mb-0">
-                                    <i class="fas fa-calculator me-2"></i>
-                                    Total de Servicios: <?php echo count($servicios); ?>
-                                </h4>
-                                <p class="mb-0">
-                                    Período: <?php echo formatearFecha($fecha_inicio, 'd/m/Y'); ?> -
-                                    <?php echo formatearFecha($fecha_fin, 'd/m/Y'); ?>
-                                </p>
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <h2 class="mb-0">
-                                    <i class="fas fa-money-bill-wave me-2"></i>
-                                    S/. <?php echo number_format($total_recaudado + 100, 2); ?>
-                                </h2>
-                                <small>Total Recaudado S/. <?php echo number_format($total_recaudado, 2); ?></small><br>
-
-                                <?php
-                                $fondo_caja = 100;
-                                $total_con_fondo = $total_recaudado + $fondo_caja;
-                                ?>
-
-                                <small>Fondo de caja: S/. <?php echo number_format($fondo_caja, 2); ?></small><br>
-
-                            </div>
-
-                        </div>
+            <div class="card-body p-3">
+                <?php if (empty($servicios)): ?>
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No hay servicios registrados</h5>
+                        <p class="text-muted">No se encontraron servicios en el rango de fechas seleccionado.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered align-middle mb-0 text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Placa</th>
+                                    <th>Cochera</th>
+                                    <th>Fecha Registro</th>
+                                    <th>Hora Inicio</th>
+                                    <th>Fecha Salida</th>
+                                    <th>Hora Salida</th>
+                                    <th>Duración</th>
+                                    <th>Precio/Hora</th>
+                                    <th>Total</th>
+                                    <th>Fecha Pago</th>
+                                    <th>Usuario</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($servicios as $servicio): ?>
+                                    <tr>
+                                        <td><?= $servicio['id_alquiler']; ?></td>
+                                        <td><strong><?= $servicio['placa']; ?></strong></td>
+                                        <td><span class="badge bg-primary"><?= $servicio['codigo']; ?></span></td>
+                                        <td><?= formatearFecha($servicio['fecha_ingreso'], 'd/m/Y'); ?></td>
+                                        <td><?= date('H:i', strtotime($servicio['hora_ingreso'])); ?></td>
+                                        <td><?= formatearFecha($servicio['fecha_salida'], 'd/m/Y'); ?></td>
+                                        <td><?= date('H:i', strtotime($servicio['hora_salida'])); ?></td>
+                                        <td><span class="badge bg-info"><?= number_format($servicio['duracion']); ?>m</span></td>
+                                        <td>S/ <?= number_format(3, 2) ?></td>
+                                        <td><strong class="text-success">S/. <?= number_format($servicio['importe'], 2); ?></strong></td>
+                                        <td><?= formatearFecha($servicio['fecha_pago'], 'd/m/Y H:i'); ?></td>
+                                        <td><?= $servicio['usuario_nombres'] . ' ' . $servicio['usuario_apellidos']; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Resumen de Totales -->
+        <?php if (!empty($servicios)): ?>
+            <div class="card shadow-sm p-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap">
+                    <div>
+                        <h6>Total de Servicios: <?= count($servicios); ?></h6>
+                        <p class="mb-0">Período: <?= formatearFecha($fecha_inicio, 'd/m/Y'); ?> - <?= formatearFecha($fecha_fin, 'd/m/Y'); ?></p>
+                    </div>
+                    <div class="text-end">
+                        <?php $fondo_caja = 100; ?>
+                        <h5>Total Recaudado: S/. <?= number_format($total_recaudado + $fondo_caja, 2); ?></h5>
+                        <small>Total Recaudado S/. <?= number_format($total_recaudado, 2); ?></small><br>
+                        <small>Fondo de caja: S/. <?= number_format($fondo_caja, 2); ?></small>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
     </div>
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>

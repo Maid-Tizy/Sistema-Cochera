@@ -143,8 +143,8 @@ function obtenerRecaudacionDia()
     return (float)$r['total'];
 }
 
-/** Devuelve historial de servicios finalizados, filtrable por fecha */
-function obtenerHistorialServicios($fi = null, $ff = null, $id_usuario = null, $es_admin = false)
+/** Devuelve historial de servicios finalizados, filtrable por fecha y usuario */
+function obtenerHistorialServicios($fi = null, $ff = null, $id_usuario = null, $es_admin = false, $id_usuario_filtro = null)
 {
     $sql = "SELECT a.id_alquiler,a.placa,a.codigo,a.fecha_ingreso,a.hora_ingreso,a.fecha_salida,a.hora_salida,
                    p.duracion,p.importe,p.fecha_pago,e.id_espacio,
@@ -154,12 +154,21 @@ function obtenerHistorialServicios($fi = null, $ff = null, $id_usuario = null, $
                JOIN espacios e USING(id_espacio)
                LEFT JOIN usuarios u ON a.id_usuario = u.id_usuario
                WHERE a.estado='F'";
+    
     $p = [];
+
     // Filtrado por usuario si NO es administrador
     if (!$es_admin && $id_usuario) {
         $sql .= " AND a.id_usuario=?";
         $p[] = $id_usuario;
     }
+
+    // Filtrado opcional por usuario si es admin y hay filtro seleccionado
+    if ($es_admin && $id_usuario_filtro) {
+        $sql .= " AND a.id_usuario=?";
+        $p[] = $id_usuario_filtro;
+    }
+
     // Filtrado opcional por rango de fechas
     if ($fi && $ff) {
         $sql .= " AND DATE(p.fecha_pago) BETWEEN ? AND ?";
@@ -172,7 +181,18 @@ function obtenerHistorialServicios($fi = null, $ff = null, $id_usuario = null, $
         $sql .= " AND DATE(p.fecha_pago)<=?";
         $p[] = $ff;
     }
+
     $sql .= " ORDER BY p.fecha_pago DESC";
     $s = ejecutarConsulta($sql, $p);
     return $s?->fetchAll() ?: [];
+}
+
+/** Devuelve todos los usuarios activos */
+function obtenerTodosUsuarios() {
+    $sql = "SELECT id_usuario, CONCAT(nombres, ' ', apellidos) AS nombre_completo
+            FROM usuarios
+            WHERE estado='A'
+            ORDER BY nombres, apellidos";
+    $stmt = ejecutarConsulta($sql);
+    return $stmt?->fetchAll() ?: [];
 }

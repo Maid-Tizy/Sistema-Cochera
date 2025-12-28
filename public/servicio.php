@@ -16,7 +16,7 @@ $recaudacion_dia = obtenerRecaudacionDia();
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Espacios Ocupados - Sistema de Cochera</title>
+  <title>Sistema de Cochera</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <link href="assets/css/dashboard.css" rel="stylesheet">
@@ -25,8 +25,8 @@ $recaudacion_dia = obtenerRecaudacionDia();
 
 <body>
 
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
             <a class="navbar-brand" href="dashboard.php">
                 <i class="fas fa-car me-2"></i>
@@ -45,14 +45,14 @@ $recaudacion_dia = obtenerRecaudacionDia();
                 <?php endif; ?>
             </div>
             <div class="navbar-nav ms-3">
-
-                <a class="nav-link text-white" href="servicio.php">
-                    <i class="fas fa-users-cog me-1"></i>En Servicio
-                </a>
+                <?php if (!esAdmin()): ?>
+                    <a class="nav-link text-white" href="servicio.php">
+                        <i class="fas fa-users-cog me-1"></i>En Servicio
+                    </a>
+                <?php endif; ?>
                 <a class="nav-link text-white" href="registro.php">
                     <i class="fas fa-th-large me-1"></i>Registro
                 </a>
-
             </div>
 
             <div class="navbar-nav ms-auto">
@@ -65,37 +65,77 @@ $recaudacion_dia = obtenerRecaudacionDia();
 
         </div>
     </nav>
-    <div class="modal fade" id="usuarioModal" tabindex="-1" aria-labelledby="usuarioModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content text-center p-3">
 
-                <!-- Icono de usuario -->
-                <div class="mb-3">
-                    <i class="fas fa-user-circle fa-5x text-primary"></i>
+    <!-- MODAL USUARIO -->
+    <div class="modal fade" id="usuarioModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-md">
+            <div class="modal-content shadow-lg border-0">
+
+                <!-- Header -->
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title d-flex align-items-center">
+                        <i class="fas fa-id-badge me-2"></i>
+                        Perfil de Usuario
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
-                <!-- Título -->
-                <h5 class="modal-title mb-3" id="usuarioModalLabel">Información del Usuario</h5>
-
-                <!-- Cuerpo del modal -->
+                <!-- Body -->
                 <div class="modal-body">
 
-                    <p class="fs-5"><strong>Usuario:</strong> <?= htmlspecialchars($usuario['usuario']) ?></p>
-                    <p class="fs-5"><strong>Cargo:</strong> <?= $usuario['cargo'] === 'A' ? 'Administrador' : 'Básico' ?></p>
+                    <!-- Avatar -->
+                    <div class="text-center mb-3">
+                        <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center"
+                            style="width:110px;height:110px;">
+                            <i class="fas fa-user fa-4x text-primary"></i>
+                        </div>
+                    </div>
 
-                    <p class="fs-1"><strong>Bienvenido al sistema</strong></p>
+                    <!-- Nombre -->
+                    <h5 class="text-center fw-bold mb-1">
+                        <?= htmlspecialchars($usuario['nombre']); ?>
+                    </h5>
+
+                    <!-- Rol -->
+                    <div class="text-center mb-3">
+                        <span class="badge <?= $usuario['cargo'] === 'A' ? 'bg-success' : 'bg-secondary' ?> px-3 py-2">
+                            <i class="fas fa-user-shield me-1"></i>
+                            <?= $usuario['cargo'] === 'A' ? 'Administrador' : 'Usuario' ?>
+                        </span>
+                    </div>
+
+                    <!-- Info -->
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-user text-primary me-2"></i>
+                                <span class="fw-semibold">Usuario:</span>
+                                <span class="ms-auto"><?= htmlspecialchars($usuario['usuario']) ?></span>
+                            </div>
+
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-circle-check text-success me-2"></i>
+                                <span class="fw-semibold">Estado:</span>
+                                <span class="ms-auto">Activo</span>
+                            </div>
+
+                        </div>
+                    </div>
 
                 </div>
 
                 <!-- Footer -->
-                <div class="modal-footer justify-content-center">
-                    <a href="logout.php" class="btn btn-danger me-2">
-                        <i class="fas fa-sign-out-alt me-1"></i>Cerrar Sesión
-                    </a>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        Cerrar
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cerrar
                     </button>
+
+                    <a href="logout.php" class="btn btn-danger">
+                        <i class="fas fa-sign-out-alt me-1"></i> Cerrar sesión
+                    </a>
                 </div>
+
             </div>
         </div>
     </div>
@@ -148,7 +188,7 @@ $recaudacion_dia = obtenerRecaudacionDia();
                 data-estado="<?php echo htmlspecialchars($espacio['estado_actual']); ?>"
                 data-placa="<?php echo htmlspecialchars($espacio['placa'] ?? ''); ?>"
                 onclick="abrirVentanaEspacio(<?php echo (int)$espacio['id_espacio']; ?>)">
-                <div class="espacio-numero">Estacionamiento <?php echo (int)$espacio['id_espacio']; ?></div>
+                <div class="espacio-numero">Espacio <?php echo $espacio['codigo']; ?></div>
                 <div class="espacio-icono"><i class="fas fa-car"></i></div>
                 <div class="espacio-estado">Ocupado</div>
                 <?php if (!empty($espacio['placa'])): ?><div class="espacio-placa"><?php echo htmlspecialchars($espacio['placa']); ?></div><?php endif; ?>

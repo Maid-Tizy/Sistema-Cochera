@@ -1,28 +1,169 @@
+<?php
+require_once __DIR__ . '/../app/includes/auth.php';
+require_once __DIR__ . '/../app/services/servicios.php';
+
+requiereAutenticacion();
+
+$usuario = obtenerUsuarioActual();
+$conteo = obtenerConteoEspacios();
+$espacios = obtenerEspacios();
+$recaudacion_dia = obtenerRecaudacionDia();
+
+/* ===============================
+   🔹 ESTADÍSTICAS SOLO ADMIN
+=============================== */
+$rec_hoy = ejecutarConsulta(
+    "SELECT COALESCE(SUM(importe),0) total 
+     FROM pagos 
+     WHERE DATE(fecha_pago)=CURDATE()"
+)?->fetch()['total'] ?? 0;
+
+$rec_mes = ejecutarConsulta(
+    "SELECT COALESCE(SUM(importe),0) total 
+     FROM pagos 
+     WHERE MONTH(fecha_pago)=MONTH(CURDATE())
+       AND YEAR(fecha_pago)=YEAR(CURDATE())"
+)?->fetch()['total'] ?? 0;
+
+$rec_total = ejecutarConsulta(
+    "SELECT COALESCE(SUM(importe),0) total 
+     FROM pagos"
+)?->fetch()['total'] ?? 0;
+
+$servicios_hoy = ejecutarConsulta(
+    "SELECT COUNT(*) total 
+     FROM alquiler 
+     WHERE DATE(fecha_ingreso)=CURDATE()"
+)?->fetch()['total'] ?? 0;
+
+
+$meta_dia = 500;     // meta diaria estimada
+$meta_mes = 12000;  // meta mensual estimada
+$capacidad_servicios = $conteo['total'] * 3; // rotación estimada
+
+function porcentaje($valor, $max)
+{
+    if ($max <= 0 || $valor <= 0) return 0;
+    return min(100, round(($valor / $max) * 100));
+}
+
+$porc_ocupacion = porcentaje($conteo['ocupados'], $conteo['total']);
+$porc_hoy = porcentaje($rec_hoy, $meta_dia);
+$porc_mes = porcentaje($rec_mes, $meta_mes);
+$porc_servicios = porcentaje($servicios_hoy, $capacidad_servicios);
+
+
+
+$ranking_cajeros = ejecutarConsulta("
+    SELECT 
+        u.id_usuario,
+        CONCAT(u.nombres,' ',u.apellidos) cajero,
+        COUNT(p.id_pago) servicios,
+        SUM(p.importe) total
+    FROM pagos p
+    JOIN alquiler a USING(id_alquiler)
+    JOIN usuarios u ON a.id_usuario = u.id_usuario
+    WHERE DATE(p.fecha_pago)=CURDATE()
+    GROUP BY u.id_usuario
+    ORDER BY total DESC
+")->fetchAll();
+
+$cajero_top = $ranking_cajeros[0] ?? null;
+
+$total_dia = array_sum(array_column($ranking_cajeros, 'total'));
+
+
+$promedio_servicio = ($cajero_top && $cajero_top['servicios'] > 0)
+    ? round($cajero_top['total'] / $cajero_top['servicios'], 2)
+    : 0;
+
+$participacion = ($total_dia > 0 && $cajero_top)
+    ? porcentaje($cajero_top['total'], $total_dia)
+    : 0;
+
+?>
+
+
+
 <!DOCTYPE html>
 <html lang="es">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Espacios Disponibles - Sistema de Cochera</title>
+    <title>Sistema de Cochera</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="assets/css/dashboard.css" rel="stylesheet">
 </head>
+<style>
+/* Tarjeta estadística uniforme */
+.stat-card {
+    height: 100%;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Zona superior (icono o círculo) */
+.stat-top {
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Círculo estadístico */
+.stat-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* Círculo interno */
+.stat-circle::after {
+    content: "";
+    width: 85px;
+    height: 85px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+}
+
+/* Texto central */
+.stat-circle span {
+    position: relative;
+    z-index: 2;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+/* Texto inferior */
+.stat-label {
+    text-align: center;
+    margin-top: 10px;
+    font-weight: 600;
+    min-height: 40px;
+}
+
+/* Subtexto */
+.stat-sub {
+    font-size: 0.85rem;
+    color: #6c757d;
+    min-height: 18px;
+}
+
+</style>
 
 <body>
-    <?php
-    require_once __DIR__ . '/../app/includes/auth.php';
-    require_once __DIR__ . '/../app/services/servicios.php';
 
-
-    requiereAutenticacion();
-
-    $usuario = obtenerUsuarioActual();
-    $conteo = obtenerConteoEspacios();
-    $espacios = obtenerEspacios();
-    $recaudacion_dia = obtenerRecaudacionDia();
-    ?>
 
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -44,14 +185,14 @@
                 <?php endif; ?>
             </div>
             <div class="navbar-nav ms-3">
-
-                <a class="nav-link text-white" href="servicio.php">
-                    <i class="fas fa-users-cog me-1"></i>En Servicio
-                </a>
+                <?php if (!esAdmin()): ?>
+                    <a class="nav-link text-white" href="servicio.php">
+                        <i class="fas fa-users-cog me-1"></i>En Servicio
+                    </a>
+                <?php endif; ?>
                 <a class="nav-link text-white" href="registro.php">
                     <i class="fas fa-th-large me-1"></i>Registro
                 </a>
-
             </div>
 
             <div class="navbar-nav ms-auto">
@@ -64,37 +205,77 @@
 
         </div>
     </nav>
-    <div class="modal fade" id="usuarioModal" tabindex="-1" aria-labelledby="usuarioModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content text-center p-3">
 
-                <!-- Icono de usuario -->
-                <div class="mb-3">
-                    <i class="fas fa-user-circle fa-5x text-primary"></i>
+    <!-- MODAL USUARIO -->
+    <div class="modal fade" id="usuarioModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-md">
+            <div class="modal-content shadow-lg border-0">
+
+                <!-- Header -->
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title d-flex align-items-center">
+                        <i class="fas fa-id-badge me-2"></i>
+                        Perfil de Usuario
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
-                <!-- Título -->
-                <h5 class="modal-title mb-3" id="usuarioModalLabel">Información del Usuario</h5>
-
-                <!-- Cuerpo del modal -->
+                <!-- Body -->
                 <div class="modal-body">
 
-                    <p class="fs-5"><strong>Usuario:</strong> <?= htmlspecialchars($usuario['usuario']) ?></p>
-                    <p class="fs-5"><strong>Cargo:</strong> <?= $usuario['cargo'] === 'A' ? 'Administrador' : 'Básico' ?></p>
+                    <!-- Avatar -->
+                    <div class="text-center mb-3">
+                        <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center"
+                            style="width:110px;height:110px;">
+                            <i class="fas fa-user fa-4x text-primary"></i>
+                        </div>
+                    </div>
 
-                    <p class="fs-1"><strong>Bienvenido al sistema</strong></p>
+                    <!-- Nombre -->
+                    <h5 class="text-center fw-bold mb-1">
+                        <?= htmlspecialchars($usuario['nombre']); ?>
+                    </h5>
+
+                    <!-- Rol -->
+                    <div class="text-center mb-3">
+                        <span class="badge <?= $usuario['cargo'] === 'A' ? 'bg-success' : 'bg-secondary' ?> px-3 py-2">
+                            <i class="fas fa-user-shield me-1"></i>
+                            <?= $usuario['cargo'] === 'A' ? 'Administrador' : 'Usuario' ?>
+                        </span>
+                    </div>
+
+                    <!-- Info -->
+                    <div class="card border-0 bg-light">
+                        <div class="card-body">
+
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="fas fa-user text-primary me-2"></i>
+                                <span class="fw-semibold">Usuario:</span>
+                                <span class="ms-auto"><?= htmlspecialchars($usuario['usuario']) ?></span>
+                            </div>
+
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-circle-check text-success me-2"></i>
+                                <span class="fw-semibold">Estado:</span>
+                                <span class="ms-auto">Activo</span>
+                            </div>
+
+                        </div>
+                    </div>
 
                 </div>
 
                 <!-- Footer -->
-                <div class="modal-footer justify-content-center">
-                    <a href="logout.php" class="btn btn-danger me-2">
-                        <i class="fas fa-sign-out-alt me-1"></i>Cerrar Sesión
-                    </a>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        Cerrar
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cerrar
                     </button>
+
+                    <a href="logout.php" class="btn btn-danger">
+                        <i class="fas fa-sign-out-alt me-1"></i> Cerrar sesión
+                    </a>
                 </div>
+
             </div>
         </div>
     </div>
@@ -104,12 +285,16 @@
     <div class="container-fluid py-4">
         <!-- Indicadores Superiores -->
         <div class="row mb-4">
-            <div class="col-md-3">
+
+            <!-- Espacios Ocupados -->
+            <div class="col-md-4">
                 <div class="card bg-primary text-white">
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col">
-                                <h4 class="mb-0"><?php echo $conteo['ocupados']; ?>/<?php echo $conteo['total']; ?></h4>
+                                <h4 class="mb-0">
+                                    <?php echo $conteo['ocupados']; ?>/<?php echo $conteo['total']; ?>
+                                </h4>
                                 <small>Espacios Ocupados</small>
                             </div>
                             <div class="col-auto">
@@ -120,12 +305,15 @@
                 </div>
             </div>
 
-            <div class="col-md-3">
+            <!-- Espacios Libres -->
+            <div class="col-md-4">
                 <div class="card bg-success text-white">
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col">
-                                <h4 class="mb-0"><?php echo $conteo['total'] - $conteo['ocupados']; ?></h4>
+                                <h4 class="mb-0">
+                                    <?php echo $conteo['total'] - $conteo['ocupados']; ?>
+                                </h4>
                                 <small>Espacios Libres</small>
                             </div>
                             <div class="col-auto">
@@ -136,12 +324,15 @@
                 </div>
             </div>
 
-            <div class="col-md-3">
+            <!-- Caja -->
+            <div class="col-md-4">
                 <div class="card bg-info text-white">
                     <div class="card-body">
                         <div class="row align-items-center">
                             <div class="col">
-                                <h4 class="mb-0">S/. <?php echo number_format($recaudacion_dia + 100, 2); ?></h4>
+                                <h4 class="mb-0">
+                                    S/. <?php echo number_format($recaudacion_dia + 100, 2); ?>
+                                </h4>
                                 <small>Total caja + fondo inicial (S/100.00)</small>
                             </div>
                             <div class="col-auto">
@@ -152,64 +343,184 @@
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <button class="btn btn-light btn-sm w-100" id="btnPararServicio">
-                                    <i class="fas fa-search me-1"></i>
-                                    Parar Servicio
-                                </button>
-                                <small class="d-block mt-1">Buscar por placa</small>
+        </div>
+
+        <?php if (esAdmin()): ?>
+            <div class="row mb-4 text-center">
+
+                <!-- Ocupación -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm">
+                        <div class="d-flex justify-content-center">
+                            <div class="stat-circle"
+                                style="background: conic-gradient(#0d6efd <?= $porc_ocupacion ?>%, #e9ecef 0);">
+                                <span><?= $porc_ocupacion ?>%</span>
+                            </div>
+                        </div>
+                        <div class="stat-label">Ocupación Actual</div>
+                    </div>
+                </div>
+
+                <!-- Ingresos Hoy -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm">
+                        <div class="d-flex justify-content-center">
+                            <div class="stat-circle"
+                                style="background: conic-gradient(#198754 <?= $porc_hoy ?>%, #e9ecef 0);">
+                                <span>S/ <?= number_format($rec_hoy, 2) ?></span>
+                            </div>
+                        </div>
+                        <div class="stat-label">
+                            Ingresos Hoy<br>
+                            <small class="text-muted"><?= $porc_hoy ?>% de meta</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ingresos del Mes -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm">
+                        <div class="d-flex justify-content-center">
+                            <div class="stat-circle"
+                                style="background: conic-gradient(#6f42c1 <?= $porc_mes ?>%, #e9ecef 0);">
+                                <span>S/ <?= number_format($rec_mes, 0) ?></span>
+                            </div>
+                        </div>
+                        <div class="stat-label">
+                            Ingresos del Mes<br>
+                            <small class="text-muted"><?= $porc_mes ?>% de meta</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Servicios -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm">
+                        <div class="d-flex justify-content-center">
+                            <div class="stat-circle"
+                                style="background: conic-gradient(#fd7e14 <?= $porc_servicios ?>%, #e9ecef 0);">
+                                <span><?= $servicios_hoy ?></span>
+                            </div>
+                        </div>
+                        <div class="stat-label">
+                            Servicios Hoy<br>
+                            <small class="text-muted"><?= $porc_servicios ?>% capacidad</small>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        <?php endif; ?>
+        <?php if (esAdmin()): ?>
+            <div class="row mb-4 text-center">
+
+                <!-- Cajero Top -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm h-100 d-flex justify-content-between">
+                        <div class="stat-top">
+                            <i class="fas fa-user-tie fa-2x text-primary"></i>
+                        </div>
+                        <div class="stat-title">Cajero líder</div>
+                        <div class="stat-value fw-bold">
+                            <?= $cajero_top['cajero'] ?? '—' ?>
+                        </div>
+                        <div class="stat-sub">
+                            S/ <?= number_format($cajero_top['total'] ?? 0, 2) ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Servicios del líder -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm h-100 d-flex justify-content-between">
+                        <div class="stat-top">
+                            <i class="fas fa-car-side fa-2x text-success"></i>
+                        </div>
+                        <div class="stat-title">Servicios (líder)</div>
+                        <div class="stat-value display-6">
+                            <?= $cajero_top['servicios'] ?? 0 ?>
+                        </div>
+                        <div class="stat-sub">&nbsp;</div>
+                    </div>
+                </div>
+
+                <!-- Promedio -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm h-100 d-flex justify-content-between">
+                        <div class="stat-top">
+                            <i class="fas fa-calculator fa-2x text-warning"></i>
+                        </div>
+                        <div class="stat-title">Promedio / Servicio</div>
+                        <div class="stat-value display-6">
+                            S/ <?= number_format($promedio_servicio, 2) ?>
+                        </div>
+                        <div class="stat-sub">&nbsp;</div>
+                    </div>
+                </div>
+
+                <!-- Participación -->
+                <div class="col-md-3">
+                    <div class="card p-3 shadow-sm h-100 d-flex justify-content-between">
+                        <div class="stat-top d-flex justify-content-center">
+                            <div class="stat-circle"
+                                style="background: conic-gradient(#dc3545 <?= $participacion ?>%, #e9ecef 0);">
+                                <span><?= $participacion ?>%</span>
+                            </div>
+                        </div>
+                        <div class="stat-title">Participación</div>
+                        <div class="stat-value fw-bold">del total diario</div>
+                        <div class="stat-sub">&nbsp;</div>
+                    </div>
+                </div>
+
+            </div>
+        <?php endif; ?>
+
+
+
+        <!-- Grid de Espacios Libres -->
+        <?php if (!esAdmin()): ?>
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-th-large me-2"></i>
+                                Espacios Disponibles
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="espacios-grid">
+                                <?php foreach ($espacios as $espacio): ?>
+                                    <?php if ($espacio['estado_actual'] === 'A'): // Solo libres 
+                                    ?>
+                                        <?php
+                                        $clase_estado = 'espacio-libre';
+                                        $icono_estado = 'fas fa-parking';
+                                        $texto_estado = 'Disponible';
+                                        ?>
+                                        <div class="espacio-item <?php echo $clase_estado; ?>"
+                                            data-id="<?php echo $espacio['id_espacio']; ?>"
+                                            data-estado="<?php echo $espacio['estado_actual']; ?>"
+                                            onclick="abrirVentanaEspacio(<?php echo $espacio['id_espacio']; ?>)">
+                                            <div class="espacio-numero">
+                                                Espacio <?php echo $espacio['codigo']; ?>
+                                            </div>
+                                            <div class="espacio-icono">
+                                                <i class="<?php echo $icono_estado; ?>"></i>
+                                            </div>
+                                            <div class="espacio-estado">
+                                                <?php echo $texto_estado; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Grid de Espacios Libres -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-th-large me-2"></i>
-                            Espacios Disponibles
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="espacios-grid">
-                            <?php foreach ($espacios as $espacio): ?>
-                                <?php if ($espacio['estado_actual'] === 'A'): // Solo libres 
-                                ?>
-                                    <?php
-                                    $clase_estado = 'espacio-libre';
-                                    $icono_estado = 'fas fa-parking';
-                                    $texto_estado = 'Disponible';
-                                    ?>
-                                    <div class="espacio-item <?php echo $clase_estado; ?>"
-                                        data-id="<?php echo $espacio['id_espacio']; ?>"
-                                        data-estado="<?php echo $espacio['estado_actual']; ?>"
-                                        onclick="abrirVentanaEspacio(<?php echo $espacio['id_espacio']; ?>)">
-                                        <div class="espacio-numero">
-                                            Cochera <?php echo $espacio['id_espacio']; ?>
-                                        </div>
-                                        <div class="espacio-icono">
-                                            <i class="<?php echo $icono_estado; ?>"></i>
-                                        </div>
-                                        <div class="espacio-estado">
-                                            <?php echo $texto_estado; ?>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Modal para Gestión de Espacio -->
@@ -373,9 +684,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/dashboard.js" defer></script>
-
-
-
 </body>
 
 </html>
